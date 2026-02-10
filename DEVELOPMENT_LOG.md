@@ -1,16 +1,16 @@
 # 项目开发过程文档（谷歌财务模型）
 
 ## 1. 目标与范围
-- 目标：基于你提供的年报，叠加网络公开信息，快速形成一个可解释、可复用的谷歌估值模型。
+- 目标：基于**最近 4 年年报**（2022–2025 年 10-K），叠加网络公开信息，快速形成一个可解释、可复用的谷歌估值模型。
 - 范围：先完成一版“公司整体 DCF”，暂不做复杂三表联动和分部联动。
 
 ## 2. 执行过程
-1. 读取并定位年报关键章节：
+1. 读取并定位年报关键章节（2022、2023、2024、2025 年 10-K）：
    - 合并利润表
    - 合并现金流量表
    - 资产负债表
    - 分部信息（Google Services / Cloud / Other Bets）
-2. 提取 2023-2025 历史数据并计算核心比率（增长率、利润率、现金流率）。
+2. 提取 2022–2025 历史数据并计算核心比率（增长率、利润率、现金流率）。
 3. 联网检索宏观锚点：
    - 10Y 美债收益率（用于 Rf）
    - 美联储 2% 通胀长期目标（用于终值增长逻辑）
@@ -60,7 +60,7 @@
 - 关键改进：
   1. **新增 Segment_PL tab**：Google Services / Cloud 各自拆出 Employee Comp + Other Costs（数据来自年报 Note 15）；Other Bets 用 OI margin 反推；Alphabet-level unallocated 单列
   2. **交叉验证行**：Segment_PL 中「Sum of Segment OI」与 Consolidated_PL 中「EBIT」比对，差异应=0
-  3. **假设全面历史锚点**：Assumptions tab 每个参数都显示 2023A/2024A/2025A 历史值（灰色列）
+  3. **假设全面历史锚点**：Assumptions tab 每个参数都显示 2022A–2025A 历史值（灰色列）
   4. **CapEx 绝对值**：2026 使用管理层 Q4'25 earnings call 指引 $175B-$185B（中值 $180B），而非 % of revenue
   5. **术语脚注**：每个 Tab 底部添加 Glossary，解释所有缩写（TAC/COGS/SBC/UFCF/WACC/NOPAT/EV/D&A/OI&E/NWC/Ke/Kd）中英文对照
   6. **三情景 CHOOSE 增强**：Revenue Growth 拆为 Base/Bull/Bear 三个独立区块
