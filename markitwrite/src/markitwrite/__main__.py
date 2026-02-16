@@ -68,6 +68,65 @@ def main(argv: list[str] | None = None) -> int:
     # -- formats command --
     subparsers.add_parser("formats", help="List supported document formats.")
 
+    # -- assist command (vision assistant) --
+    assist_parser = subparsers.add_parser(
+        "assist",
+        help="AI vision assistant: one sentence → screenshot → paste into document.",
+    )
+    assist_parser.add_argument(
+        "instruction",
+        help='Natural language instruction, e.g. "把屏幕上的DCF模型截图放到report.docx里"',
+    )
+    assist_parser.add_argument(
+        "--image",
+        default=None,
+        help="Use this image instead of taking a screenshot.",
+    )
+    assist_parser.add_argument(
+        "--output", "-o",
+        default=None,
+        help="Override output document path (inferred from instruction if omitted).",
+    )
+    assist_parser.add_argument(
+        "--monitor",
+        type=int,
+        default=0,
+        help="Monitor index for screenshot (0=all, 1=first, etc.)",
+    )
+    assist_parser.add_argument(
+        "--model",
+        default=None,
+        help="Claude model to use for vision analysis.",
+    )
+    assist_parser.add_argument(
+        "--quiet", "-q",
+        action="store_true",
+        help="Suppress progress output.",
+    )
+
+    # -- quick command (screenshot + paste, no AI) --
+    quick_parser = subparsers.add_parser(
+        "quick",
+        help="Quick capture: screenshot full screen and paste into document (no AI).",
+    )
+    quick_parser.add_argument(
+        "--output", "-o",
+        default="output.docx",
+        help="Output document path (default: output.docx).",
+    )
+    quick_parser.add_argument(
+        "--monitor",
+        type=int,
+        default=0,
+        help="Monitor index (0=all, 1=first, etc.)",
+    )
+    quick_parser.add_argument(
+        "--width",
+        type=float,
+        default=None,
+        help="Image width in inches.",
+    )
+
     args = parser.parse_args(argv)
 
     if args.command is None:
@@ -122,6 +181,67 @@ def main(argv: list[str] | None = None) -> int:
                 f"({result.target_format}, {len(result.output)} bytes)"
             )
             return 0
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+    if args.command == "assist":
+        try:
+            from markitwrite.vision import VisionAssistant
+
+            assistant = VisionAssistant(
+                model=args.model,
+                verbose=not args.quiet,
+            )
+            result = assistant.run(
+                instruction=args.instruction,
+                image_path=args.image,
+                output_path=args.output,
+                monitor=args.monitor,
+            )
+            if result.success:
+                print(f"Done: {result.summary}")
+                return 0
+            else:
+                print(f"Failed: {result.summary}", file=sys.stderr)
+                return 1
+        except ImportError as e:
+            print(
+                f"Error: Vision assistant requires extra dependencies.\n"
+                f"  pip install 'markitwrite[vision]'\n"
+                f"Detail: {e}",
+                file=sys.stderr,
+            )
+            return 1
+        except Exception as e:
+            print(f"Error: {e}", file=sys.stderr)
+            return 1
+
+    if args.command == "quick":
+        try:
+            from markitwrite.vision import VisionAssistant
+
+            assistant = VisionAssistant(verbose=True)
+            size = {"width": args.width} if args.width else None
+            result = assistant.quick_capture(
+                output_path=args.output,
+                monitor=args.monitor,
+                size=size,
+            )
+            if result.success:
+                print(f"Done: {result.summary}")
+                return 0
+            else:
+                print(f"Failed: {result.summary}", file=sys.stderr)
+                return 1
+        except ImportError as e:
+            print(
+                f"Error: Quick capture requires 'mss' or 'pyautogui'.\n"
+                f"  pip install mss\n"
+                f"Detail: {e}",
+                file=sys.stderr,
+            )
+            return 1
         except Exception as e:
             print(f"Error: {e}", file=sys.stderr)
             return 1

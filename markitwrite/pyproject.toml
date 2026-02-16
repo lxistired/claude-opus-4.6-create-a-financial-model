@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "markitwrite"
-version = "0.1.0"
+version = "0.2.0"
 description = "AI virtual clipboard - paste images into any document format (DOCX, PPTX, Markdown)"
 readme = "README.md"
 license = {text = "MIT"}
@@ -18,14 +18,23 @@ all = [
     "python-docx>=1.0.0",
     "python-pptx>=0.6.21",
     "Pillow>=10.0.0",
+    "mss>=9.0.0",
+    "anthropic>=0.39.0",
 ]
 docx = ["python-docx>=1.0.0"]
 pptx = ["python-pptx>=0.6.21"]
+vision = [
+    "mss>=9.0.0",
+    "anthropic>=0.39.0",
+    "Pillow>=10.0.0",
+]
 dev = [
     "pytest>=7.0",
     "python-docx>=1.0.0",
     "python-pptx>=0.6.21",
     "Pillow>=10.0.0",
+    "mss>=9.0.0",
+    "anthropic>=0.39.0",
 ]
 
 [project.scripts]
