@@ -1,6 +1,7 @@
-"""Claude Vision analyzer - the 'brain' that understands what's on screen.
+"""Vision analyzer - the 'brain' that understands what's on screen.
 
-Sends screenshots to Claude's multimodal API and gets back:
+Uses OpenRouter (OpenAI-compatible API) with Gemini 3 Flash for multimodal analysis.
+Sends screenshots and gets back:
 - Content description (what's in the image)
 - Region coordinates (where a specific element is)
 - Structured extraction (tables, charts, text)
@@ -19,7 +20,7 @@ from markitwrite.vision.capture import Region
 
 @dataclass
 class AnalysisResult:
-    """Structured result from Claude Vision analysis."""
+    """Structured result from vision analysis."""
 
     description: str = ""
     regions: list[dict] = field(default_factory=list)
@@ -40,22 +41,47 @@ class AnalysisResult:
 
 
 class VisionAnalyzer:
-    """Analyze images using Claude's multimodal Vision API.
+    """Analyze images using OpenRouter's multimodal API (Gemini 3 Flash).
 
-    Requires: pip install anthropic
-    Set ANTHROPIC_API_KEY env var or pass api_key to constructor.
+    Requires: pip install openai
+    Set OPENROUTER_API_KEY env var or pass api_key to constructor.
     """
 
-    DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+    OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+    DEFAULT_MODEL = "google/gemini-3-flash-preview"
 
     def __init__(
         self,
         api_key: Optional[str] = None,
         model: Optional[str] = None,
+        base_url: Optional[str] = None,
     ):
-        import anthropic
+        import os
 
-        self._client = anthropic.Anthropic(api_key=api_key) if api_key else anthropic.Anthropic()
+        import openai
+
+        # Resolve API key: explicit arg > OPENROUTER_API_KEY env > OPENAI_API_KEY env
+        resolved_key = (
+            api_key
+            or os.environ.get("OPENROUTER_API_KEY")
+            or os.environ.get("OPENAI_API_KEY")
+        )
+        if not resolved_key:
+            raise ValueError(
+                "No API key found. Set OPENROUTER_API_KEY environment variable "
+                "or pass api_key to VisionAnalyzer()."
+            )
+
+        resolved_base = base_url or self.OPENROUTER_BASE_URL
+
+        self._client = openai.OpenAI(
+            api_key=resolved_key,
+            base_url=resolved_base,
+            default_headers={
+                "HTTP-Referer": "https://github.com/markitwrite/markitwrite",
+                "X-Title": "markitwrite-vision",
+            },
+        )
         self._model = model or self.DEFAULT_MODEL
 
     def describe(self, image_bytes: bytes, question: str = "") -> AnalysisResult:
@@ -136,15 +162,7 @@ IMPORTANT:
             user_instruction: e.g. "把DCF模型截图放到report.docx第3段后面"
 
         Returns:
-            Action plan dict, e.g.:
-            {
-                "action": "screenshot_and_paste",
-                "target_element": "DCF model table",
-                "target_document": "report.docx",
-                "position": {"paragraph": 3},
-                "size": {"width": 6.0},
-                "reasoning": "User wants the DCF valuation table..."
-            }
+            Action plan dict.
         """
         prompt = f"""You are a smart file assistant. The user gave you this instruction:
 
@@ -175,9 +193,7 @@ Return ONLY the JSON, no other text."""
         Used as the first step - understand what the user wants before
         deciding whether we even need a screenshot.
         """
-        import anthropic
-
-        response = self._client.messages.create(
+        response = self._client.chat.completions.create(
             model=self._model,
             max_tokens=1024,
             messages=[
@@ -205,7 +221,7 @@ Return ONLY the JSON, no other text.""",
                 }
             ],
         )
-        raw = response.content[0].text
+        raw = response.choices[0].message.content
         return self._parse_json_response(raw)
 
     def verify_result(
@@ -234,59 +250,55 @@ Return JSON:
 
 Return ONLY the JSON."""
 
-        b64_before = base64.standard_b64encode(before_bytes).decode("utf-8")
-        b64_after = base64.standard_b64encode(after_bytes).decode("utf-8")
+        before_data_uri = self._make_data_uri(before_bytes)
+        after_data_uri = self._make_data_uri(after_bytes)
 
-        import anthropic
-
-        response = self._client.messages.create(
+        response = self._client.chat.completions.create(
             model=self._model,
             max_tokens=1024,
             messages=[
                 {
                     "role": "user",
                     "content": [
+                        {"type": "text", "text": prompt},
                         {
-                            "type": "text",
-                            "text": prompt,
+                            "type": "image_url",
+                            "image_url": {"url": before_data_uri},
                         },
                         {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/png",
-                                "data": b64_before,
-                            },
-                        },
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": "image/png",
-                                "data": b64_after,
-                            },
+                            "type": "image_url",
+                            "image_url": {"url": after_data_uri},
                         },
                     ],
                 }
             ],
         )
-        raw = response.content[0].text
+        raw = response.choices[0].message.content
         return self._parse_json_response(raw)
 
     # ── internals ──
 
-    def _call_vision(self, image_bytes: bytes, prompt: str) -> str:
-        """Send image + prompt to Claude Vision, return text response."""
-        b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
-
-        # Detect media type from magic bytes
-        media_type = "image/png"
+    @staticmethod
+    def _detect_media_type(image_bytes: bytes) -> str:
+        """Detect image media type from magic bytes."""
         if image_bytes[:2] == b"\xff\xd8":
-            media_type = "image/jpeg"
-        elif image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
-            media_type = "image/webp"
+            return "image/jpeg"
+        if image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+            return "image/webp"
+        return "image/png"
 
-        response = self._client.messages.create(
+    @staticmethod
+    def _make_data_uri(image_bytes: bytes) -> str:
+        """Create a data URI from image bytes (for OpenAI vision API)."""
+        media_type = VisionAnalyzer._detect_media_type(image_bytes)
+        b64 = base64.standard_b64encode(image_bytes).decode("utf-8")
+        return f"data:{media_type};base64,{b64}"
+
+    def _call_vision(self, image_bytes: bytes, prompt: str) -> str:
+        """Send image + prompt to vision model via OpenRouter, return text."""
+        data_uri = self._make_data_uri(image_bytes)
+
+        response = self._client.chat.completions.create(
             model=self._model,
             max_tokens=2048,
             messages=[
@@ -294,12 +306,8 @@ Return ONLY the JSON."""
                     "role": "user",
                     "content": [
                         {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": b64,
-                            },
+                            "type": "image_url",
+                            "image_url": {"url": data_uri},
                         },
                         {
                             "type": "text",
@@ -309,11 +317,11 @@ Return ONLY the JSON."""
                 }
             ],
         )
-        return response.content[0].text
+        return response.choices[0].message.content
 
     @staticmethod
     def _parse_json_response(raw: str) -> dict:
-        """Extract JSON from Claude's response (handles markdown fences)."""
+        """Extract JSON from model response (handles markdown fences)."""
         # Try direct parse first
         try:
             return json.loads(raw)

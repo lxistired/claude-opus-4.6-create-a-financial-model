@@ -96,7 +96,7 @@ def main(argv: list[str] | None = None) -> int:
     assist_parser.add_argument(
         "--model",
         default=None,
-        help="Claude model to use for vision analysis.",
+        help="Model ID for vision analysis (default: google/gemini-3-flash-preview via OpenRouter).",
     )
     assist_parser.add_argument(
         "--quiet", "-q",

@@ -2,9 +2,9 @@
 """Vision Assistant Demo - 在本地机器上运行此脚本来测试完整流程。
 
 前置条件:
-    1. pip install 'markitwrite[vision]'   (安装 mss + anthropic)
+    1. pip install 'markitwrite[vision]'   (安装 mss + openai)
     2. pip install 'markitwrite[all]'      (安装所有文档格式支持)
-    3. export ANTHROPIC_API_KEY="sk-ant-..."
+    3. export OPENROUTER_API_KEY="sk-or-..."
     4. 确保有一个显示器 (不能在无头服务器上截屏)
 
 用法:
@@ -150,7 +150,7 @@ def demo_5_components_standalone():
 
     analyzer = VisionAnalyzer()
     result = analyzer.describe(img_bytes, "这个屏幕上有什么？用中文回答。")
-    print(f"  Claude says: {result.description[:200]}...")
+    print(f"  Gemini says: {result.description[:200]}...")
 
     # --- 5c: 单独定位元素 ---
     print("\n5c: 定位屏幕元素")
@@ -225,7 +225,7 @@ if __name__ == "__main__":
 
         checks = [
             ("mss (截屏)", "mss"),
-            ("anthropic (Claude API)", "anthropic"),
+            ("openai (OpenRouter API)", "openai"),
             ("python-docx (Word)", "docx"),
             ("python-pptx (PPT)", "pptx"),
             ("Pillow (图像处理)", "PIL"),
@@ -239,17 +239,17 @@ if __name__ == "__main__":
                 print(f"  [MISSING] {name}")
                 all_ok = False
 
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        api_key = os.environ.get("OPENROUTER_API_KEY", "")
         if api_key:
-            print(f"  [OK] ANTHROPIC_API_KEY (set, ...{api_key[-4:]})")
+            print(f"  [OK] OPENROUTER_API_KEY (set, ...{api_key[-4:]})")
         else:
-            print("  [MISSING] ANTHROPIC_API_KEY - AI功能不可用")
+            print("  [MISSING] OPENROUTER_API_KEY - AI功能不可用")
             all_ok = False
 
         if not all_ok:
             print("\n安装缺失依赖:")
             print("  pip install 'markitwrite[all]'")
-            print("  export ANTHROPIC_API_KEY='sk-ant-...'")
+            print("  export OPENROUTER_API_KEY='sk-or-...'")
             print()
 
         # 运行 demo 2 (不需要截屏，最安全)

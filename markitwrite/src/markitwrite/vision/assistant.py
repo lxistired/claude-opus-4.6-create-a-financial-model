@@ -52,12 +52,12 @@ class VisionAssistant:
     """Multimodal file assistant: one sentence → screenshot → paste → done.
 
     Pipeline:
-      1. Parse intent (Claude text) → understand what user wants
+      1. Parse intent (Gemini 3 Flash via OpenRouter) → understand what user wants
       2. Take screenshot (mss/pyautogui) → full screen capture
-      3. Analyze screenshot (Claude Vision) → find target region
+      3. Analyze screenshot (Vision API) → find target region
       4. Crop region (PIL) → extract the relevant part
       5. Paste into document (markitwrite) → insert into DOCX/PPTX/MD
-      6. (Optional) Verify result (Claude Vision) → QA check
+      6. (Optional) Verify result (Vision API) → QA check
 
     Example:
         assistant = VisionAssistant()
@@ -87,8 +87,8 @@ class VisionAssistant:
     ):
         """
         Args:
-            api_key: Anthropic API key. Uses ANTHROPIC_API_KEY env var if None.
-            model: Claude model to use. Defaults to claude-sonnet-4-5-20250929.
+            api_key: OpenRouter API key. Uses OPENROUTER_API_KEY env var if None.
+            model: Model to use. Defaults to google/gemini-3-flash-preview.
             verbose: Print progress to stderr.
             on_step: Callback for each pipeline step (for UI integration).
         """
@@ -141,7 +141,7 @@ class VisionAssistant:
             region: Skip AI locate, use this exact crop region.
             output_path: Override the output path (otherwise inferred from instruction).
             monitor: Which monitor to capture (0=all, 1=first, etc.)
-            verify: If True, use Claude Vision to verify the result.
+            verify: If True, use Vision API to verify the result.
 
         Returns:
             AssistantResult with output path, summary, and step logs.
@@ -305,7 +305,7 @@ class VisionAssistant:
 
         # ── Optional: Verify ──
         if verify:
-            self._log("Bonus: Verifying result with Claude Vision...")
+            self._log("Bonus: Verifying result with Vision API...")
             # We'd need to render the output doc as an image to verify.
             # For now, log as skipped - full verification needs doc-to-image.
             steps.append(StepLog(step="verify", status="skipped", detail="not yet implemented"))
